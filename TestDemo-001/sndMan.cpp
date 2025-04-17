@@ -21,7 +21,8 @@ std::vector<const char*> waveAssets =
 };
 
 CSoundManager::CSoundManager() :
-    mCurrWave( -1 )
+    mCurrWave       ( -1 ),
+    muiCutoffFreq   (  0 )
 {
 #if ENABLE_RAW_OUT_STREAM
     FILE* f = fopen("TAP_AUDIO_WAVESTREAM.raw", "wb" );
@@ -34,7 +35,7 @@ CSoundManager::CSoundManager() :
 
     LoadWaveFiles();
 
-    PlaySound(0);
+//  PlaySound(0);
 }
 
 CSoundManager::~CSoundManager()
@@ -265,6 +266,7 @@ void CSoundManager::InitFilter( size_t freq, size_t cutOffFreq )
     float rc = 1.0f / (2.0f * M_PI * cutOffFreq);
     float dt = 1.0f / freq;
 
+    muiCutoffFreq   = cutOffFreq;
     mfFilterAlpha   = dt / (rc + dt);
     mfFilterHistIn  = 0;
     mfFilterHistOut = 0;
@@ -289,4 +291,15 @@ void CSoundManager::ProcessFilter ( char* data, int dataLen )
 
         mfFilterHistOut = psData[numSamples-1];
     }
+}
+
+void CSoundManager::SetFilterParam( float fParam )
+{
+    WaveFileInfo wfi = mWaveFiles[mCurrWave];
+
+    float rc = 1.0f / (2.0f * M_PI * muiCutoffFreq);
+    float dt = 1.0f / wfi.freq;
+
+    // Scale the alpha smoothing coefficient: [0 -> 100]% of default value
+    mfFilterAlpha = fParam * (dt / (rc + dt));
 }

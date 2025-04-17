@@ -68,7 +68,9 @@ public:
 
 public:
 
-    int PlaySound( unsigned int ix );
+    int  PlaySound      ( unsigned int ix );
+
+    void SetFilterParam ( float fParam );
 
 private:
 
@@ -83,7 +85,8 @@ private:
     
     void InitFilter         ( size_t freq, size_t cutOffFreq );
     void ProcessFilter      ( char* data, int dataLen );
-    
+
+
 private:
 
     std::vector<WaveFileInfo> mWaveFiles;
@@ -94,9 +97,10 @@ private:
     size_t  mCursor; // bytes
     bool    mLoop;
     
-    float   mfFilterAlpha;
-    short   mfFilterHistIn;
-    short   mfFilterHistOut;
+    float       mfFilterAlpha;
+    unsigned    muiCutoffFreq;
+    short       mfFilterHistIn;
+    short       mfFilterHistOut;
 };
 
 #endif /* _SNDMAN_H_ */

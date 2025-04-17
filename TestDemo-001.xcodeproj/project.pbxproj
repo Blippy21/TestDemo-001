@@ -40,7 +40,7 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet section */
-		2AC4FAF62DB04B73009F272E /* Exceptions for "TestDemo-001" folder in "Copy Files" phase from "TestDemo-001" target */ = {
+		2AC4FB0F2DB0DDE0009F272E /* Exceptions for "TestDemo-001" folder in "Copy Files" phase from "TestDemo-001" target */ = {
 			isa = PBXFileSystemSynchronizedGroupBuildPhaseMembershipExceptionSet;
 			buildPhase = 2A16297C2CD799550001FE29 /* CopyFiles */;
 			membershipExceptions = (
@@ -53,7 +53,7 @@
 		2A1629802CD799550001FE29 /* TestDemo-001 */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			exceptions = (
-				2AC4FAF62DB04B73009F272E /* Exceptions for "TestDemo-001" folder in "Copy Files" phase from "TestDemo-001" target */,
+				2AC4FB0F2DB0DDE0009F272E /* Exceptions for "TestDemo-001" folder in "Copy Files" phase from "TestDemo-001" target */,
 			);
 			path = "TestDemo-001";
 			sourceTree = "<group>";

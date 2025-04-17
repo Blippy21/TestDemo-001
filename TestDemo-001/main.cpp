@@ -47,6 +47,7 @@ private:
         {
             std::cout << "OPTIONS: " << std::endl;
             std::cout << "q: quit " << std::endl;
+            std::cout << "K/L: adjust gain " << std::endl;
             std::cout << "0-9: adjust filter " << std::endl;
 
             if( fgets( inBuff, inBuffSize, stdin) != NULL )
@@ -58,6 +59,27 @@ private:
                     switch( cmd )
                     {
                         case 'q':   isRunning = false; break;
+                        case 'k':
+                        {
+                            float currGain = mSndMan.GetGain();
+
+                            if( currGain > 0.05f )
+                                mSndMan.SetGain( currGain - 0.05f );
+                            else
+                                mSndMan.SetGain( currGain - 0.01f );
+
+                            break;
+                        }
+                        case 'l':
+                        {
+                            float currGain = mSndMan.GetGain();
+
+                            if( currGain < 0.95f )
+                                mSndMan.SetGain( currGain + 0.05f );
+                            else
+                                mSndMan.SetGain( currGain + 0.01f );
+                            break;
+                        }
                         default:
                         {
                             if( cmd >= '0' && cmd <= '9' )

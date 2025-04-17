@@ -21,8 +21,9 @@ std::vector<const char*> waveAssets =
 };
 
 CSoundManager::CSoundManager() :
-    mCurrWave       ( -1 ),
-    muiCutoffFreq   (  0 )
+    mCurrWave               ( -1 ),
+    mfFilterAlphaDefault    (  0 ),
+    mfGain                  ( 1.f )
 {
 #if ENABLE_RAW_OUT_STREAM
     FILE* f = fopen("TAP_AUDIO_WAVESTREAM.raw", "wb" );
@@ -32,6 +33,8 @@ CSoundManager::CSoundManager() :
         fclose( f );
     }
 #endif
+
+    memset( mAqb, 0, sizeof(mAqb) );
 
     LoadWaveFiles();
 
@@ -85,6 +88,8 @@ int CSoundManager::PlaySound( unsigned int ix )
 #endif
 
         AllocQueueBuffers( aq );
+
+        CreateAudioPipe();
 
         InitFilter( wfi.freq, 100 );
 
@@ -222,6 +227,8 @@ void CSoundManager::FillBuffer( AudioQueueRef aq, AudioQueueBufferRef aqb )
 
         memcpy( psDstData, psSrcData, bytesToCopy );
 
+        RunAudioPipe( psDstData, bytesToCopy );
+
         ProcessFilter( psDstData, bytesToCopy );
 
         mCursor += bytesToCopy;
@@ -266,10 +273,10 @@ void CSoundManager::InitFilter( size_t freq, size_t cutOffFreq )
     float rc = 1.0f / (2.0f * M_PI * cutOffFreq);
     float dt = 1.0f / freq;
 
-    muiCutoffFreq   = cutOffFreq;
-    mfFilterAlpha   = dt / (rc + dt);
-    mfFilterHistIn  = 0;
-    mfFilterHistOut = 0;
+    mfFilterAlpha        = dt / (rc + dt);
+    mfFilterAlphaDefault = mfFilterAlpha;
+    mfFilterHistIn       = 0;
+    mfFilterHistOut      = 0;
 
 }
 
@@ -293,13 +300,153 @@ void CSoundManager::ProcessFilter ( char* data, int dataLen )
     }
 }
 
+void CSoundManager::SetGain( float fGain )
+{
+    if( fGain >= 0.f && fGain <= 1.f )
+    {
+        mfGain = fGain;
+    }
+}
+
+float CSoundManager::GetGain( void )
+{
+    return mfGain;
+}
+
 void CSoundManager::SetFilterParam( float fParam )
 {
-    WaveFileInfo wfi = mWaveFiles[mCurrWave];
-
-    float rc = 1.0f / (2.0f * M_PI * muiCutoffFreq);
-    float dt = 1.0f / wfi.freq;
-
     // Scale the alpha smoothing coefficient: [0 -> 100]% of default value
-    mfFilterAlpha = fParam * (dt / (rc + dt));
+    mfFilterAlpha = fParam * mfFilterAlphaDefault;
 }
+
+#if 1
+
+CCyclicBuffer::CCyclicBuffer( int memSize ) :
+    muiValidBytes   ( 0 ),
+    mWC             ( 0 ),
+    mRC             ( 0 )
+{
+    mpMem = new char[memSize];
+    if( mpMem )
+    {
+        muiMemSize = memSize;
+    }
+}
+
+CCyclicBuffer::~CCyclicBuffer()
+{
+    delete mpMem;
+    mpMem = nullptr;
+}
+
+int CCyclicBuffer::WriteData( char* pBuff, unsigned int numBytes )
+{
+    int space = muiMemSize - muiValidBytes;
+
+    if( numBytes > space )
+    {
+        printf("Warning: Overflow\n");
+        numBytes = space;
+    }
+
+    int toCopy = numBytes;
+
+    while( toCopy )
+    {
+        int toEnd = muiMemSize - mWC;
+
+        int chunk = toEnd > toCopy ? toCopy : toEnd;
+
+        memcpy( &mpMem[mWC], pBuff, chunk );
+
+        mWC = (mWC + chunk) % muiMemSize;
+        toCopy -= chunk;
+        pBuff += chunk;
+        muiValidBytes += chunk;
+    }
+
+    return numBytes;
+}
+
+int CCyclicBuffer::ReadData( char* pBuff, unsigned int numBytes )
+{
+    if( numBytes > muiValidBytes )
+    {
+        printf("Warning: Underflow\n");
+        numBytes = muiValidBytes;
+    }
+
+    int toCopy = numBytes;
+
+    while( toCopy )
+    {
+        int toEnd = muiMemSize - mRC;
+
+        int chunk = toEnd > toCopy ? toCopy : toEnd;
+
+        memcpy( pBuff, &mpMem[mRC], chunk );
+
+        mRC = (mRC + chunk) % muiMemSize;
+        toCopy -= chunk;
+        pBuff += chunk;
+        muiValidBytes -= chunk;
+    }
+
+    return 0;
+}
+
+int CSoundManager::CreateAudioPipe( void )
+{
+    // 40ms of audio
+    constexpr unsigned int chunkSizeInMS = 40;
+    constexpr unsigned int chunkSizeOutMS = 80;
+
+    unsigned int freq = mWaveFiles[mCurrWave].freq;
+    unsigned int buffSizeIn = (unsigned int)(freq * chunkSizeInMS) / 1000;
+    unsigned int buffSizeOut = (unsigned int)(freq * chunkSizeOutMS) / 1000;
+
+    mpInputCache = new CCyclicBuffer( buffSizeIn * 2 * 2);   // assuming stereo s16 samples
+    mpOutputCache = new CCyclicBuffer( buffSizeOut * 2 * 2 );
+
+    if( !(mpInputCache && mpOutputCache) )
+    {
+        return 1;
+    }
+
+    return 0;
+}
+
+int CSoundManager::RunAudioPipe( char* data, int dataLen )
+{
+    mpInputCache->WriteData( data, dataLen );
+
+    while( mpInputCache->GetValidBytes() > 512 )
+    {
+        // process audio chunks
+        constexpr unsigned int chunkSizeBytes = 512;
+        char chunk[chunkSizeBytes] = {0};
+
+        mpInputCache->ReadData( chunk, chunkSizeBytes );
+
+        // ...process
+        // do a simple gain adjustment
+        int numSamples = chunkSizeBytes / 2;   // s16
+        for( int i = 0; i < numSamples; ++i )
+        {
+            ((short*)chunk)[i] *= mfGain;
+        }
+
+        mpOutputCache->WriteData( chunk, chunkSizeBytes );
+    }
+
+    memset( data, 0, dataLen );
+
+    if( mpOutputCache->GetValidBytes() >= dataLen )
+    {
+        mpOutputCache->ReadData( data, dataLen );
+    }
+
+    return 0;
+}
+
+#endif

@@ -58,6 +58,29 @@ struct WaveFileDesc
     WAVEDATAChunk   WaveData;
 };
 
+class CCyclicBuffer
+{
+public:
+    CCyclicBuffer( int memSize );
+    ~CCyclicBuffer();
+
+public:
+    int WriteData       ( char* pBuff, unsigned int numBytes );
+    int ReadData        ( char* pBuff, unsigned int numBytes );
+    int GetValidBytes   ( void )
+        { return muiValidBytes; }
+
+private:
+    char*        mpMem;
+    unsigned int muiMemSize;
+
+    unsigned int muiValidBytes;
+
+    unsigned int mWC;   // Write
+    unsigned int mRC;   // Read
+};
+
+
 /* CSoundManager class */
 class CSoundManager
 {
@@ -69,6 +92,9 @@ public:
 public:
 
     int  PlaySound      ( unsigned int ix );
+
+    void  SetGain       ( float fGain );
+    float GetGain       ( void );
 
     void SetFilterParam ( float fParam );
 
@@ -86,11 +112,15 @@ private:
     void InitFilter         ( size_t freq, size_t cutOffFreq );
     void ProcessFilter      ( char* data, int dataLen );
 
+    int  CreateAudioPipe    ( void );
+    int  RunAudioPipe       ( char* data, int dataLen );
 
 private:
 
     std::vector<WaveFileInfo> mWaveFiles;
-    
+
+    float   mfGain;
+
     AudioQueueBufferRef mAqb[4];
     
     int     mCurrWave;
@@ -98,9 +128,12 @@ private:
     bool    mLoop;
     
     float       mfFilterAlpha;
-    unsigned    muiCutoffFreq;
+    float       mfFilterAlphaDefault;
     short       mfFilterHistIn;
     short       mfFilterHistOut;
+
+    CCyclicBuffer* mpInputCache;
+    CCyclicBuffer* mpOutputCache;
 };
 
 #endif /* _SNDMAN_H_ */
